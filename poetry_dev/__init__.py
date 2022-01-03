@@ -10,7 +10,7 @@ import typer
 
 app = typer.Typer()
 
-Requirement = Union[str, Dict[str, str]]
+Requirement = Dict[str, str]
 Dependencies = Dict[str, Requirement]
 
 
@@ -35,7 +35,10 @@ def get_dependencies() -> Dependencies:
     pyproject_path = get_pyproject_path()
 
     pyproject = tomlkit.parse(pyproject_path.read_text())
-    return pyproject["tool"]["poetry"]["dependencies"]
+    return {
+        name: {"version": req} if isinstance(req, str) else req
+        for name, req in pyproject["tool"]["poetry"]["dependencies"].items()
+    }
 
 
 def set_changed_dependencies(changed_dependencies: Dependencies) -> None:
@@ -73,11 +76,12 @@ def version():
     dependencies = get_dependencies()
     changed_dependencies = {}
     for name, req in dependencies.items():
-        if isinstance(req, dict) and "path" in req and get_pyproject_path(pathlib.Path(req["path"])).exists():
+        if "path" in req and get_pyproject_path(pathlib.Path(req["path"])).exists():
             version_req = "^" + get_version(pathlib.Path(req["path"]))
             changed_dependencies[name] = dependencies[name].copy()
             del changed_dependencies[name]["path"]
-            changed_dependencies[name].pop("develop")
+            if "develop" in req:
+                del changed_dependencies[name]["develop"]
             changed_dependencies[name]["version"] = req["version"] = version_req
             typer.echo(f"{name}: Changing path requirement ../{name} to version requirement {req['version']}")
 
@@ -92,9 +96,6 @@ def path(develop: bool = typer.Option(True, help="Install path dependencies in d
     dependencies = get_dependencies()
     changed_dependencies = {}
     for name, req in dependencies.items():
-        if isinstance(req, str):
-            dependencies[name] = req = {"version": req}
-
         if "path" not in req and get_pyproject_path(pathlib.Path("..") / name).exists():
             changed_dependencies[name] = dependencies[name].copy()
             del changed_dependencies[name]["version"]

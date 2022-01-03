@@ -99,7 +99,7 @@ build-backend = "poetry.masonry.api"
     monkeypatch.setattr(poetry_dev, "get_pyproject_path", get_pyproject_path)
     monkeypatch.setattr(subprocess, "call", lambda x: None)
 
-    result = runner.invoke(app, ["version"])
+    result = runner.invoke(app, ["version"], catch_exceptions=False)
     assert result.exit_code == 0
     assert """foo = \"^0.2.0\"""" in bar_pyproject_toml.read_text()
 
